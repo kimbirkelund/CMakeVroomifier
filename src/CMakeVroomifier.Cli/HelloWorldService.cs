@@ -1,11 +1,12 @@
-﻿using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Spectre.Console;
 
 public class HelloWorldService(ILogger<HelloWorldService> logger) : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        logger.LogInformation("Hello, World!");
+        AnsiConsole.Markup("[green]Hello[/] [bold yellow]World![/]");
         return Task.CompletedTask;
     }
 
