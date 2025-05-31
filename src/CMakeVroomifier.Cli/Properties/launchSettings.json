@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CMakeVroomifier.Cli": {
+      "commandName": "Project",
+      "commandLineArgs": "--path X:\\safepilot"
+    }
+  }
+}
