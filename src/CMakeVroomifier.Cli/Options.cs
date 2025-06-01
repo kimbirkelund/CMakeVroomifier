@@ -1,9 +1,12 @@
+using System.Reactive.Subjects;
 using CommandLine;
 
 namespace CMakeVroomifier.Cli;
 
 public class Options
 {
+    public ISubject<object> RebuildReasons { get; } = new Subject<object>();
+
     [Option("build-preset",
             Required = true,
             SetName = "IndividualPresets",
@@ -13,6 +16,11 @@ public class Options
         get => field ?? Preset;
         set;
     }
+
+    [Option("configure-fresh",
+            Required = false,
+            HelpText = "Run the first CMake configure with the '--fresh' switch.")]
+    public bool ConfigureFresh { get; set; }
 
     [Option("configure-preset",
             Required = true,

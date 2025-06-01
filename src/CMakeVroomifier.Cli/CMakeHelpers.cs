@@ -16,7 +16,17 @@ internal static class CMakeHelpers
                                   .WithArguments($"--build --preset {opts.BuildPreset} -j 20")
                                   .WithValidation(CommandResultValidation.None)
                                   .WithStandardOutputPipe(PipeTarget.ToDelegate(Console.WriteLine))
-                                  .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Console.Error.WriteLine(s)))
+                                  .WithStandardErrorPipe(PipeTarget.ToDelegate(l =>
+                                                                               {
+                                                                                   if (l.Contains("edge && !edge->outputs_ready()"))
+                                                                                   {
+                                                                                       ConsoleHelpers.WriteHeader("BUILD FAILED: fresh configuration required", ConsoleColor.Red);
+                                                                                       opts.RebuildReasons.OnNext(new FreshConfigureRequired());
+                                                                                       throw new OperationCanceledException("Cancel current run to trigger fresh configure.");
+                                                                                   }
+
+                                                                                   Console.Error.WriteLine(l);
+                                                                               }))
                                   .WithWorkingDirectory(opts.Path);
             var result = await buildCmd.ExecuteBufferedAsync(cancellationToken);
             if (result.ExitCode == 0)
@@ -42,11 +52,14 @@ internal static class CMakeHelpers
         ConsoleHelpers.WriteHeader("Configuring", ConsoleColor.DarkGray);
         try
         {
+            var runFresh = opts.ConfigureFresh ? " --fresh" : "";
+            opts.ConfigureFresh = false;
+
             var configureCmd = CliWrap.Cli.Wrap("cmake")
-                                      .WithArguments($"--preset {opts.ConfigurePreset}")
+                                      .WithArguments($"--preset {opts.ConfigurePreset}{runFresh}")
                                       .WithValidation(CommandResultValidation.None)
                                       .WithStandardOutputPipe(PipeTarget.ToDelegate(Console.WriteLine))
-                                      .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Console.Error.WriteLine(s)))
+                                      .WithStandardErrorPipe(PipeTarget.ToDelegate(l => Console.Error.WriteLine(l)))
                                       .WithWorkingDirectory(opts.Path);
             var result = await configureCmd.ExecuteBufferedAsync(cancellationToken);
             if (result.ExitCode == 0)
@@ -80,7 +93,7 @@ internal static class CMakeHelpers
                                  .WithArguments(testArgs)
                                  .WithValidation(CommandResultValidation.None)
                                  .WithStandardOutputPipe(PipeTarget.ToDelegate(Console.WriteLine))
-                                 .WithStandardErrorPipe(PipeTarget.ToDelegate(s => Console.Error.WriteLine(s)))
+                                 .WithStandardErrorPipe(PipeTarget.ToDelegate(l => Console.Error.WriteLine(l)))
                                  .WithWorkingDirectory(opts.Path);
             var result = await testCmd.ExecuteBufferedAsync(cancellationToken);
             if (result.ExitCode == 0)

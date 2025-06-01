@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
@@ -16,7 +17,7 @@ public static class Program
                  .ParseArguments<Options>(args)
                  .WithParsedAsync(RunWithOptions);
 
-    private static async Task ExecuteAndWait(bool runConfigure, IList<string> changes, Options opts, CancellationToken cancellationToken)
+    private static async Task ExecuteAndWait(bool runConfigure, IReadOnlyCollection<string> changes, Options opts, CancellationToken cancellationToken)
     {
         Console.Clear();
 
@@ -63,7 +64,7 @@ public static class Program
         WriteHeader("All tests passed.", ConsoleColor.Green);
     }
 
-    private static async Task HandleFileChangesAsync(IList<string> changes, bool runConfigure, Options opts, CancellationToken cancellationToken)
+    private static async Task HandleFileChangesAsync(IReadOnlyCollection<string> changes, bool runConfigure, Options opts, CancellationToken cancellationToken)
     {
         if (await IsGitRebasingAsync())
         {
@@ -123,19 +124,42 @@ public static class Program
 
         BehaviorSubject<CancellationTokenSource> cts = new(new CancellationTokenSource());
         var bufferCloser = new BehaviorSubject<Unit>(Unit.Default);
-        var changes = fileWatcher.Changes
-                                 .Do(_ => cts.Value.Cancel())
-                                 .Buffer(bufferCloser)
-                                 .Select(files => files.Distinct().ToList())
-                                 .ToEnumerable();
+        var rebuildReasons = fileWatcher.Changes
+                                        .Do(_ => cts.Value.Cancel())
+                                        .Buffer(bufferCloser)
+                                        .Select(files => files.Distinct().ToImmutableList())
+                                        .Select(f => f.Any()
+                                                         ? (object)new FilesChanged(f)
+                                                         : new RebuildNotRequired())
+                                        .Merge(opts.RebuildReasons
+                                                   .Do(_ => cts.Value.Cancel()))
+                                        .ToEnumerable();
 
         var firstRun = true;
-        foreach (var changedFiles in changes)
+        foreach (var rebuildReason in rebuildReasons)
         {
-            if (changedFiles.Any() || firstRun)
+            IReadOnlyCollection<string> changedFiles = [];
+            var runConfigure = firstRun;
+            var doRun = runConfigure;
+
+            switch (rebuildReason)
+            {
+                case FilesChanged(var files):
+                    changedFiles = files;
+                    doRun = true;
+                    break;
+
+                case FreshConfigureRequired:
+                    runConfigure = true;
+                    opts.ConfigureFresh = true;
+                    doRun = true;
+                    break;
+            }
+
+            if (doRun)
             {
                 cts.OnNext(new CancellationTokenSource());
-                await HandleFileChangesAsync(changedFiles, firstRun, opts, cts.Value.Token);
+                await HandleFileChangesAsync(changedFiles, runConfigure, opts, cts.Value.Token);
                 firstRun = false;
             }
 
