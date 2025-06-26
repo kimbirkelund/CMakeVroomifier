@@ -2,7 +2,7 @@
   "profiles": {
     "CMakeVroomifier.Cli": {
       "commandName": "Project",
-      "commandLineArgs": "--path X:\\safepilot -s Windows_Debug"
+      "commandLineArgs": "--path X:\\safepilot -s Windows_Debug --exclude-tests \"UKCTest|MQTTManagerTest\" --post-test-script-encoded IHdyaXRlLWhvc3QgImJvYiI7IHdyaXRlLWhvc3QgImh1bmQiIA== --pre-configure-script \"write-host 'bob hund'; return $true\""
     }
   }
 }

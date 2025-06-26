@@ -1,6 +1,7 @@
 using System.Xml;
 using CliWrap;
 using CliWrap.Buffered;
+using static CMakeVroomifier.Cli.ConsoleHelpers;
 
 namespace CMakeVroomifier.Cli;
 
@@ -8,8 +9,15 @@ internal static class CMakeHelpers
 {
     public static async Task<bool> BuildAsync(Options opts, CancellationToken cancellationToken)
     {
+        if (cancellationToken.IsCancellationRequested)
+            return false;
+
         Console.Clear();
-        ConsoleHelpers.WriteHeader("Building", ConsoleColor.DarkGray);
+
+        if (!await RunScriptsAsync("Pre-building script", opts.PreBuildScript, opts.PreBuildScriptEncoded, cancellationToken))
+            return false;
+
+        WriteHeader("Building", ConsoleColor.DarkGray);
         try
         {
             var buildCmd = CliWrap.Cli.Wrap("cmake")
@@ -20,7 +28,7 @@ internal static class CMakeHelpers
                                                                                {
                                                                                    if (l.Contains("edge && !edge->outputs_ready()"))
                                                                                    {
-                                                                                       ConsoleHelpers.WriteHeader("BUILD FAILED: fresh configuration required", ConsoleColor.Red);
+                                                                                       WriteHeader("BUILD FAILED: fresh configuration required", ConsoleColor.Red);
                                                                                        opts.RebuildReasons.OnNext(new FreshConfigureRequired());
                                                                                        throw new OperationCanceledException("Cancel current run to trigger fresh configure.");
                                                                                    }
@@ -32,7 +40,7 @@ internal static class CMakeHelpers
             if (result.ExitCode == 0)
                 return true;
 
-            ConsoleHelpers.WriteHeader("BUILD FAILED", ConsoleColor.Red);
+            WriteHeader("BUILD FAILED", ConsoleColor.Red);
             return false;
         }
         catch (OperationCanceledException)
@@ -41,15 +49,22 @@ internal static class CMakeHelpers
         }
         catch (Exception ex)
         {
-            ConsoleHelpers.WriteHeader($"BUILD FAILED: {ex.Message}", ConsoleColor.Red);
+            WriteHeader($"BUILD FAILED: {ex.Message}", ConsoleColor.Red);
             return false;
         }
     }
 
     public static async Task<bool> ConfigureAsync(Options opts, CancellationToken cancellationToken)
     {
+        if (cancellationToken.IsCancellationRequested)
+            return false;
+
         Console.Clear();
-        ConsoleHelpers.WriteHeader("Configuring", ConsoleColor.DarkGray);
+
+        if (!await RunScriptsAsync("Pre-configure script", opts.PreConfigureScript, opts.PreConfigureScriptEncoded, cancellationToken))
+            return false;
+
+        WriteHeader("Configuring", ConsoleColor.DarkGray);
         try
         {
             var runFresh = opts.ConfigureFresh ? " --fresh" : "";
@@ -65,7 +80,7 @@ internal static class CMakeHelpers
             if (result.ExitCode == 0)
                 return true;
 
-            ConsoleHelpers.WriteHeader("CONFIGURE FAILED", ConsoleColor.Red);
+            WriteHeader("CONFIGURE FAILED", ConsoleColor.Red);
             return false;
         }
         catch (OperationCanceledException)
@@ -74,15 +89,22 @@ internal static class CMakeHelpers
         }
         catch (Exception ex)
         {
-            ConsoleHelpers.WriteHeader($"CONFIGURE FAILED: {ex.Message}", ConsoleColor.Red);
+            WriteHeader($"CONFIGURE FAILED: {ex.Message}", ConsoleColor.Red);
             return false;
         }
     }
 
     public static async Task<bool> TestAsync(Options opts, CancellationToken cancellationToken)
     {
+        if (cancellationToken.IsCancellationRequested)
+            return false;
+
         Console.Clear();
-        ConsoleHelpers.WriteHeader("Testing", ConsoleColor.DarkGray);
+
+        if (!await RunScriptsAsync("Pre-test script", opts.PreTestScript, opts.PreTestScriptEncoded, cancellationToken))
+            return false;
+
+        WriteHeader("Testing", ConsoleColor.DarkGray);
         var xmlOutput = Path.GetTempFileName();
         var testArgs = $"--preset {opts.TestPreset} --parallel --progress --output-junit {xmlOutput}";
         if (!string.IsNullOrWhiteSpace(opts.ExcludeTests))
@@ -97,11 +119,19 @@ internal static class CMakeHelpers
                                  .WithWorkingDirectory(opts.Path);
             var result = await testCmd.ExecuteBufferedAsync(cancellationToken);
             if (result.ExitCode == 0)
+            {
+                Console.Clear();
+                WriteHeader("All tests passed.", ConsoleColor.Green);
+
+                if (!await RunScriptsAsync("Post-test script", opts.PostTestScript, opts.PostTestScriptEncoded, cancellationToken))
+                    return false;
+
                 return true;
+            }
 
             // Parse XML and print failed tests
             Console.Clear();
-            ConsoleHelpers.WriteHeader("TESTS FAILED", ConsoleColor.Red);
+            WriteHeader("TESTS FAILED", ConsoleColor.Red);
             try
             {
                 var xml = new XmlDocument();
@@ -140,8 +170,22 @@ internal static class CMakeHelpers
         }
         catch (Exception ex)
         {
-            ConsoleHelpers.WriteHeader($"TESTS FAILED: {ex.Message}", ConsoleColor.Red);
+            WriteHeader($"TESTS FAILED: {ex.Message}", ConsoleColor.Red);
             return false;
         }
+    }
+
+    private static async Task<bool> RunScriptsAsync(string header, string? script, string? encodedScript, CancellationToken cancellationToken)
+    {
+        WriteHeader(header, ConsoleColor.DarkGray);
+        if (script is { Length: > 0 } || encodedScript is { Length: > 0 })
+        {
+            if (!await PowershellScriptExecutor.ExecuteScriptAsync(script, cancellationToken))
+                return false;
+            if (!await PowershellScriptExecutor.ExecuteEncodedScriptAsync(encodedScript, cancellationToken))
+                return false;
+        }
+
+        return true;
     }
 }

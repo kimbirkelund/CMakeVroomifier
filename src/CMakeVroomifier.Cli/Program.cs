@@ -41,27 +41,20 @@ public static class Program
         ProcessHelpers.WaitForNoCmakeProcesses(cancellationToken);
         ProcessHelpers.WaitForNoCtestProcesses(cancellationToken);
 
-        // If runConfigure is true, run configure and then return if it fails
-        if (runConfigure && !await CMakeHelpers.ConfigureAsync(opts, cancellationToken))
-            return;
+        IEnumerable<Func<Task<bool>>> actions =
+        [
+            runConfigure
+                ? () => CMakeHelpers.ConfigureAsync(opts, cancellationToken)
+                : () => Task.FromResult(true),
+            () => CMakeHelpers.BuildAsync(opts, cancellationToken),
+            () => CMakeHelpers.TestAsync(opts, cancellationToken)
+        ];
 
-        if (cancellationToken.IsCancellationRequested)
-            return;
-
-        if (!await CMakeHelpers.BuildAsync(opts, cancellationToken))
-            return;
-
-        if (cancellationToken.IsCancellationRequested)
-            return;
-
-        if (!await CMakeHelpers.TestAsync(opts, cancellationToken))
-            return;
-
-        if (cancellationToken.IsCancellationRequested)
-            return;
-
-        Console.Clear();
-        WriteHeader("All tests passed.", ConsoleColor.Green);
+        foreach (var action in actions)
+        {
+            if (!await action())
+                return;
+        }
     }
 
     private static async Task HandleFileChangesAsync(IReadOnlyCollection<string> changes, bool runConfigure, Options opts, CancellationToken cancellationToken)
@@ -117,6 +110,11 @@ public static class Program
         Console.WriteLine($"BuildPreset: {opts.BuildPreset}");
         Console.WriteLine($"TestPreset: {opts.TestPreset}");
         Console.WriteLine($"ExcludeTests: {opts.ExcludeTests}");
+        Console.WriteLine($"ConfigureFresh: {opts.ConfigureFresh}");
+        Console.WriteLine($"PreConfigureScript: {opts.PreConfigureScript}");
+        Console.WriteLine($"PreBuildScript: {opts.PreBuildScript}");
+        Console.WriteLine($"PreTestScript: {opts.PreTestScript}");
+        Console.WriteLine($"PostTestScript: {opts.PostTestScript}");
 
         using var fileWatcher = new FileWatcher(opts.Path,
                                                 ["*.cpp", "*.h", "*.c", "*.hpp", "*.rc", "*.qrc", "CMakeLists.txt", "*.cmake", "*.ui"],
