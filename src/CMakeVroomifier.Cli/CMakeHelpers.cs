@@ -58,6 +58,8 @@ internal static class CMakeHelpers
     {
         if (cancellationToken.IsCancellationRequested)
             return false;
+        if (opts.ConfigureMode is Options.ConfigureModes.None)
+            return true;
 
         Console.Clear();
 
@@ -68,7 +70,7 @@ internal static class CMakeHelpers
         try
         {
             var runFresh = opts.ConfigureFresh ? " --fresh" : "";
-            opts.ConfigureFresh = false;
+            opts.ConfigureMode = Options.ConfigureModes.None;
 
             var configureCmd = CliWrap.Cli.Wrap("cmake")
                                       .WithArguments($"--preset {opts.ConfigurePreset}{runFresh}")

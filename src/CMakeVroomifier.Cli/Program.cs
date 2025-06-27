@@ -17,7 +17,7 @@ public static class Program
                  .ParseArguments<Options>(args)
                  .WithParsedAsync(RunWithOptions);
 
-    private static async Task ExecuteAndWait(bool runConfigure, IReadOnlyCollection<string> changes, Options opts, CancellationToken cancellationToken)
+    private static async Task ExecuteAndWait(IReadOnlyCollection<string> changes, Options opts, CancellationToken cancellationToken)
     {
         Console.Clear();
 
@@ -28,24 +28,19 @@ public static class Program
             Console.WriteLine();
         }
 
-        await ExecuteConfigureBuildTest(runConfigure, opts, cancellationToken);
+        await ExecuteConfigureBuildTest(opts, cancellationToken);
 
         WriteHeader("Waiting for changes", ConsoleColor.DarkGray);
     }
 
-    private static async Task ExecuteConfigureBuildTest(bool runConfigure, Options opts, CancellationToken cancellationToken)
+    private static async Task ExecuteConfigureBuildTest(Options opts, CancellationToken cancellationToken)
     {
-        if (runConfigure)
-            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
-
         ProcessHelpers.WaitForNoCmakeProcesses(cancellationToken);
         ProcessHelpers.WaitForNoCtestProcesses(cancellationToken);
 
         IEnumerable<Func<Task<bool>>> actions =
         [
-            runConfigure
-                ? () => CMakeHelpers.ConfigureAsync(opts, cancellationToken)
-                : () => Task.FromResult(true),
+            () => CMakeHelpers.ConfigureAsync(opts, cancellationToken),
             () => CMakeHelpers.BuildAsync(opts, cancellationToken),
             () => CMakeHelpers.TestAsync(opts, cancellationToken)
         ];
@@ -57,7 +52,7 @@ public static class Program
         }
     }
 
-    private static async Task HandleFileChangesAsync(IReadOnlyCollection<string> changes, bool runConfigure, Options opts, CancellationToken cancellationToken)
+    private static async Task HandleFileChangesAsync(IReadOnlyCollection<string> changes, Options opts, CancellationToken cancellationToken)
     {
         if (await IsGitRebasingAsync())
         {
@@ -65,8 +60,12 @@ public static class Program
             return;
         }
 
-        runConfigure |= changes.Any(f => Regex.IsMatch(f, "(CMakeLists.txt|.cmake|.rc|.qrc)$", RegexOptions.IgnoreCase | RegexOptions.Compiled));
-        await ExecuteAndWait(runConfigure, changes, opts, cancellationToken);
+        if (changes.Any(f => Regex.IsMatch(f, "(CMakeLists.txt|.cmake|.rc|.qrc)$", RegexOptions.IgnoreCase | RegexOptions.Compiled)))
+            opts.ConfigureMode = Options.ConfigureModes.Normal;
+        if (changes.Any(f => Regex.IsMatch(f, "CMakePresets.json$", RegexOptions.IgnoreCase | RegexOptions.Compiled)))
+            opts.ConfigureMode = Options.ConfigureModes.Fresh;
+
+        await ExecuteAndWait(changes, opts, cancellationToken);
     }
 
     private static async Task<bool> IsGitRebasingAsync()
@@ -110,7 +109,7 @@ public static class Program
         Console.WriteLine($"BuildPreset: {opts.BuildPreset}");
         Console.WriteLine($"TestPreset: {opts.TestPreset}");
         Console.WriteLine($"ExcludeTests: {opts.ExcludeTests}");
-        Console.WriteLine($"ConfigureFresh: {opts.ConfigureFresh}");
+        Console.WriteLine($"Fresh: {opts.ConfigureFresh}");
         Console.WriteLine($"PreConfigureScript: {opts.PreConfigureScript}");
         Console.WriteLine($"PreBuildScript: {opts.PreBuildScript}");
         Console.WriteLine($"PreTestScript: {opts.PreTestScript}");
@@ -133,12 +132,11 @@ public static class Program
                                                    .Do(_ => cts.Value.Cancel()))
                                         .ToEnumerable();
 
-        var firstRun = true;
+        opts.ConfigureMode = Options.ConfigureModes.Fresh;
         foreach (var rebuildReason in rebuildReasons)
         {
             IReadOnlyCollection<string> changedFiles = [];
-            var runConfigure = firstRun;
-            var doRun = runConfigure;
+            var doRun = opts.ConfigureMode != Options.ConfigureModes.None;
 
             switch (rebuildReason)
             {
@@ -148,7 +146,6 @@ public static class Program
                     break;
 
                 case FreshConfigureRequired:
-                    runConfigure = true;
                     opts.ConfigureFresh = true;
                     doRun = true;
                     break;
@@ -157,8 +154,8 @@ public static class Program
             if (doRun)
             {
                 cts.OnNext(new CancellationTokenSource());
-                await HandleFileChangesAsync(changedFiles, runConfigure, opts, cts.Value.Token);
-                firstRun = false;
+                await HandleFileChangesAsync(changedFiles, opts, cts.Value.Token)
+                    .IgnoreCancellationException();
             }
 
             cts.Value.Token.WaitHandle.WaitOne(Timeout.Infinite);

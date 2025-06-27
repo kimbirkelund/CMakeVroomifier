@@ -20,7 +20,19 @@ public class Options
     [Option("configure-fresh",
             Required = false,
             HelpText = "Run the first CMake configure with the '--fresh' switch.")]
-    public bool ConfigureFresh { get; set; }
+    public bool ConfigureFresh
+    {
+        get => ConfigureMode is ConfigureModes.Fresh;
+        set
+        {
+            if (value)
+                ConfigureMode = ConfigureModes.Fresh;
+            else if (!value && ConfigureMode is ConfigureModes.Fresh)
+                ConfigureMode = ConfigureModes.None;
+        }
+    }
+
+    public ConfigureModes ConfigureMode { get; set; }
 
     [Option("configure-preset",
             Required = true,
@@ -98,5 +110,12 @@ public class Options
     {
         get => field ?? Preset;
         set;
+    }
+
+    public enum ConfigureModes
+    {
+        None,
+        Normal,
+        Fresh
     }
 }
