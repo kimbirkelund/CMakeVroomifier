@@ -2,7 +2,7 @@
   "profiles": {
     "CMakeVroomifier.Cli": {
       "commandName": "Project",
-      "commandLineArgs": "--path X:\\safepilot -s Windows_Debug --exclude-tests \"UKCTest|MQTTManagerTest\" --post-test-script-encoded IHdyaXRlLWhvc3QgImJvYiI7IHdyaXRlLWhvc3QgImh1bmQiIA== --pre-configure-script \"write-host 'bob hund'; return $true\""
+      "commandLineArgs": "--path X:\\safepilot -s Windows_Debug --exclude-tests \"UKCTest|MQTTManagerTest\" --pre-build-script-encoded DQogICAgICAgIHRyeQ0KICAgICAgICB7DQogICAgICAgICAgICAiLiIsICIuXGV4dFxwbGFuZXQiLCAiLlxleHRccGxhbmV0XGxpYlxleHRlbnNpb25zXG9wZW5lbmdpbmUiIGANCiAgICAgICAgICAgIHwgRm9yRWFjaC1PYmplY3Qgew0KICAgICAgICAgICAgICAgIFB1c2gtTG9jYXRpb24gJF8NCiAgICAgICAgICAgICAgICB0cnkNCiAgICAgICAgICAgICAgICB7DQogICAgICAgICAgICAgICAgICAgICRweXRob25TY3JpcHQgPSAiJChSZXNvbHZlLVBhdGggLlxTY3JpcHRzXGVuZm9yY2Utc291cmNlLWZpbGUtZm9ybWF0dGluZy5weSkiDQoNCiAgICAgICAgICAgICAgICAgICAgcHl0aG9uMyAkcHl0aG9uU2NyaXB0DQogICAgICAgICAgICAgICAgfQ0KICAgICAgICAgICAgICAgIGZpbmFsbHkNCiAgICAgICAgICAgICAgICB7DQogICAgICAgICAgICAgICAgICAgIFBvcC1Mb2NhdGlvbg0KICAgICAgICAgICAgICAgIH0NCiAgICAgICAgICAgIH0NCiAgICAgICAgfQ0KICAgICAgICBjYXRjaCB7fQ0KICAgIA=="
     }
   }
 }

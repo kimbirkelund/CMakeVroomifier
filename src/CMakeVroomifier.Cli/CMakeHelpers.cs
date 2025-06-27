@@ -14,7 +14,7 @@ internal static class CMakeHelpers
 
         Console.Clear();
 
-        if (!await RunScriptsAsync("Pre-building script", opts.PreBuildScript, opts.PreBuildScriptEncoded, cancellationToken))
+        if (!await RunScriptsAsync("Pre-building script", opts.Path, opts.PreBuildScript, opts.PreBuildScriptEncoded, cancellationToken))
             return false;
 
         WriteHeader("Building", ConsoleColor.DarkGray);
@@ -61,7 +61,7 @@ internal static class CMakeHelpers
 
         Console.Clear();
 
-        if (!await RunScriptsAsync("Pre-configure script", opts.PreConfigureScript, opts.PreConfigureScriptEncoded, cancellationToken))
+        if (!await RunScriptsAsync("Pre-configure script", opts.Path, opts.PreConfigureScript, opts.PreConfigureScriptEncoded, cancellationToken))
             return false;
 
         WriteHeader("Configuring", ConsoleColor.DarkGray);
@@ -101,7 +101,7 @@ internal static class CMakeHelpers
 
         Console.Clear();
 
-        if (!await RunScriptsAsync("Pre-test script", opts.PreTestScript, opts.PreTestScriptEncoded, cancellationToken))
+        if (!await RunScriptsAsync("Pre-test script", opts.Path, opts.PreTestScript, opts.PreTestScriptEncoded, cancellationToken))
             return false;
 
         WriteHeader("Testing", ConsoleColor.DarkGray);
@@ -123,7 +123,7 @@ internal static class CMakeHelpers
                 Console.Clear();
                 WriteHeader("All tests passed.", ConsoleColor.Green);
 
-                if (!await RunScriptsAsync("Post-test script", opts.PostTestScript, opts.PostTestScriptEncoded, cancellationToken))
+                if (!await RunScriptsAsync("Post-test script", opts.Path, opts.PostTestScript, opts.PostTestScriptEncoded, cancellationToken))
                     return false;
 
                 return true;
@@ -175,14 +175,15 @@ internal static class CMakeHelpers
         }
     }
 
-    private static async Task<bool> RunScriptsAsync(string header, string? script, string? encodedScript, CancellationToken cancellationToken)
+    private static async Task<bool> RunScriptsAsync(string header, string path, string? script, string? encodedScript, CancellationToken cancellationToken)
     {
-        WriteHeader(header, ConsoleColor.DarkGray);
         if (script is { Length: > 0 } || encodedScript is { Length: > 0 })
         {
-            if (!await PowershellScriptExecutor.ExecuteScriptAsync(script, cancellationToken))
+            WriteHeader(header, ConsoleColor.DarkGray);
+
+            if (!await PowerShellScriptExecutor.Default.ExecuteScriptAsync(path, script, cancellationToken))
                 return false;
-            if (!await PowershellScriptExecutor.ExecuteEncodedScriptAsync(encodedScript, cancellationToken))
+            if (!await PowerShellScriptExecutor.Default.ExecuteEncodedScriptAsync(path, encodedScript, cancellationToken))
                 return false;
         }
 
