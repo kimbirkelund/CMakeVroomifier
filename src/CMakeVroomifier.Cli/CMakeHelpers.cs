@@ -122,8 +122,18 @@ internal static class CMakeHelpers
             var result = await testCmd.ExecuteBufferedAsync(cancellationToken);
             if (result.ExitCode == 0)
             {
-                Console.Clear();
-                WriteHeader("All tests passed.", ConsoleColor.Green);
+                var xml = new XmlDocument();
+                xml.Load(xmlOutput);
+                var testCases = xml.SelectNodes("//testcase")?.Count ?? 0;
+
+                if (testCases is 0)
+                    WriteHeader("No tests", ConsoleColor.Yellow);
+                else
+                {
+                    Console.Clear();
+                    WriteHeader("All tests passed.", ConsoleColor.Green);
+                    Console.WriteLine($"Executed {testCases} tests.");
+                }
 
                 if (!await RunScriptsAsync("Post-test script", opts.Path, opts.PostTestScript, opts.PostTestScriptEncoded, cancellationToken))
                     return false;
